@@ -1,0 +1,509 @@
+---
+title: "Decision Trees"
+author: "INSOFE Lab Activity on Decision Trees"
+date: "1 Apr 2018"
+output:
+  html_document:
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+---
+
+**NOTE** Before starting this assignment please remember to clear your environment, you can do that by running the following code chunk
+
+```{r}
+
+rm(list = ls(all=TRUE))
+
+```
+
+# C5.0 Trees
+
+## Goal
+
+* The goal of this activity is to predict whether a car is recommended for purchase, given various qualities of the car
+
+* For this we analyze data where expert car analysts make recommendations regarding car purchase
+
+* By analyzing their expert decision support system, we can gain interesting insights in the business oppurtunities available in the car market
+
+
+## Agenda 
+
+* Get the data
+
+* Data Pre-processing
+
+* Build a model
+
+* Predictions
+
+* Communication
+
+
+## Reading & Understanding the Data
+
+### Read the Data
+
+Make sure the dataset is located in your current working directory, or else you can change your working directory using the "setwd()" function.
+
+```{r}
+
+car_data <- read.csv("car_eval.csv")
+
+```
+
+### Understand the data
+
+* Use the str(), summary(), head() and tail() functions to get the dimensions and types of attributes in the dataset
+
+* The dataset has 1728 observations and 7 variables
+
+```{r}
+
+summary(car_data)
+
+```
+
+```{r}
+
+head(car_data)
+
+tail(car_data)
+
+```
+
+### Data Description
+
+* This dataset includes attributes that are involved while making the decision of purchasing a car.
+
+* The goal here is analyze the data for recommending cars, using decision trees
+
+* The dataset has the following attributes:
+
+1 - buying_price : The cost of purchasing the car (categorical: 4 categories)
+
+2 - maint_cost : The cost of maintaining the car (categorical: 4 categories)
+
+3 - doors : Number of doors the car has (categorical: 4 categories)
+
+4 - persons : Number of persons the car can accomodate (categorical: 3 categories)
+
+5 - lug_boot: The size of the luggage boot available in the car (categorical: 3 categories)
+
+6 - safety: The safety rating of the vehicle (categorical: 3 categories) 
+
+7 - decision: Expert recommendation given to the car (categorical: "recommended", "notRecommended")
+
+
+## Data Pre-processing
+
+### Verify Data Integrity
+
+* Verify if the dataset has missing values
+
+```{r}
+
+sum(is.na(car_data))
+
+```
+
+* Verify the data types assigned to the variables in the dataset
+
+```{r}
+
+str(car_data)
+
+```
+
+* All the variables are factors as expected, hence there is no need for converting any of them
+
+* If you want to go further and check whether there are any errors (typos for factors) in the data, you can always use the table() function
+
+```{r}
+
+# Using the lapply function, we can apply the table function on each of the varibales in the dataset
+
+lapply(car_data, table)
+
+```
+
+### Split the Data into train and test sets
+
+* Use stratified sampling to split the data into train/test sets (70/30)
+
+* Use the createDataPartition() function from the caret package to do stratified sampling
+
+```{r}
+
+library(caret)
+
+# Set the seed after attaching the caret package
+
+set.seed(007)
+
+# The first argument is the imbalanced class reference variable, the second is the proportion to sample
+
+# Remember to include list = F as the function returns a list which would not be able to subset a dataframe
+
+trainIndex <- createDataPartition(car_data$decision, p = .7, list = F)
+
+train_data <- car_data[trainIndex, ]
+
+test_data <- car_data[-trainIndex, ]
+
+```
+
+## Build a  Decision Tree
+
+### Model the tree
+
+* We will be using Quinlan's C5.0 decision tree algorithm implementation from the C50 package to build our decision tree
+
+```{r}
+
+library(C50)
+
+#Tree based model
+c5_tree <- C5.0(decision ~ . , train_data)
+
+# Use the rules = T argument if you want to extract rules later from the model
+#Rule based model
+c5_rules <- C5.0(decision ~ . , train_data, rules = T)
+
+```
+
+### Variable Importance in trees
+
+* Find the importance of each variable in the dataset using the c5imp() function
+
+* The default metric "usage" in the c5imp function gives the percentage of data being split by using the attribute at that particular time. So variable used for splitting at the root node always has 100, and the variables at the leaf nodes might be close to 0 if there is no data remaining to classify  
+
+```{r}
+
+C5imp(c5_tree, metric = "usage")
+
+```
+
+### Rules from trees
+
+* Understand the summary of the returned c5.0 rule based and tree based models
+
+```{r}
+
+summary(c5_rules)
+
+```
+
+
+* From the output of the summary above, you can clearly understand the rules and their associated metrics such as lift and support
+
+- __This is great for explicability and can also be used for understanding interesting relationships in data, even if your final model is not a decision tree__
+
+### Plotting the tree
+
+* Call the plot function on the tree object to visualize the tree
+
+```{r, fig.width= 35, fig.height=15}
+
+plot(c5_tree)
+
+```
+
+
+## Evaluating the model
+
+### Predictions on the test data
+
+* We'll evaluate the decision tree using the standard error metrics on test data
+
+```{r}
+
+preds <- predict(c5_tree, test_data)
+
+```
+
+* Error metrics for classification can be accessed through the "confusionMatrix()" function from the caret package
+
+```{r}
+
+library(caret)
+
+confusionMatrix(preds, test_data$decision)
+
+```
+
+# CART Trees
+
+* The classification and regression trees use gini index in place of the gain ratio (based on information gain) used by the ID3 based algorithms, such as c4.5 and c5.0
+
+## Implementing CART on the previous dataset
+```{r}
+#Tree based model
+library(rpart)
+rpart_tree <- rpart(decision ~ . , data = train_data, method="class")
+
+```
+
+## Tree Explicability
+
+* The variable importance can be accesssed using  variable.importance from the rpart_tree list
+
+```{r}
+
+rpart_tree$variable.importance
+
+```
+
+
+
+## Evaluating the model
+
+### Predictions on the test data
+
+* We'll evaluate the decision tree using the standard error metrics on test data
+
+```{r}
+
+preds_rpart <- predict(rpart_tree, test_data, type="class")
+
+```
+
+* Error metrics for classification can be accessed through the "confusionMatrix()" function from the caret package
+
+```{r}
+
+library(caret)
+
+confusionMatrix(preds_rpart, test_data$decision)
+
+
+```
+
+
+
+## Goal -CART for regression
+
+* The goal of this activity is to predict the imbd score of a movie using a classification and regression tree (cart)
+
+## Agenda 
+
+* Get the data
+
+* Data Pre-processing
+
+* Build a model
+
+* Predictions
+
+* Communication
+
+
+## Reading & Understanding the Data
+
+### Read the Data
+
+* Make sure the dataset is located in your current working directory, or else you can change your working directory using the "setwd()" function.
+
+* While reading in the data using the read.csv() function, make sure that you mention the argument (na.strings = "") as the data has empty values ("") which will not be encoded as NA values when the csv file is read into the R environment
+
+```{r}
+
+mov_data <- read.csv("movie_data.csv", na.strings = "")
+
+```
+
+* Select only a subset of columns from the original data for this exercise
+
+```{r}
+
+movie_data <- mov_data[, names(mov_data) %in%
+                         c("color", "num_critic_for_reviews", "duration", "director_facebook_likes",
+                           "gross", "cast_total_facebook_likes", "num_user_for_reviews", "budget",
+                           "movie_facebook_likes", "imdb_score")]
+
+```
+
+### Understand the data
+
+* Use the str(), summary(), head() and tail() functions to get the dimensions and types of attributes in the dataset
+
+* The dataset has 5043 observations and 10 variables after extracting only the important columns
+
+```{r}
+
+str(movie_data)
+
+summary(movie_data)
+
+```
+
+```{r}
+
+head(movie_data)
+
+tail(movie_data)
+
+```
+
+## Data Pre-processing
+
+### Verify Data Integrity
+
+* Verify if the dataset has missing values
+
+```{r}
+
+sum(is.na(movie_data))
+
+```
+
+* We shall impute the missing values after splitting the data into train/test
+
+
+* Verify the data types assigned to the variables in the dataset
+
+```{r}
+
+str(movie_data)
+
+```
+
+* The data types of the variables were properly assigned 
+
+### Split the Data into train and test sets
+
+* As this is a regression problem, we use only random sampling for the train/test split (70/30)
+
+```{r}
+
+set.seed(1234)
+
+train_rows <- sample(1:nrow(movie_data), 0.7*nrow(movie_data))
+
+train_reg <- movie_data[train_rows, ]
+
+test_reg <- movie_data[-train_rows, ]
+
+
+```
+
+
+### Impute the missing values
+
+* Let's first impute the missing values in the training data
+
+```{r}
+
+library(DMwR)
+
+train_reg <- knnImputation(train_reg, k = 5, scale = T)
+
+```
+
+* Now,using the distance from the training data we impute the missing values in the test dataset, using the "distData" argument in the knnImputation() function
+
+```{r}
+
+test_reg <- knnImputation(test_reg, 5, scale = T, distData = train_reg)
+
+```
+
+## Build a Regression Tree
+
+### Model the tree
+
+* We will be using the cart based decision tree algorithm implementation from the rpart package to build our regression tree
+
+
+```{r}
+
+library(rpart)
+
+reg_tree <- rpart(imdb_score ~ ., train_reg)
+
+printcp(reg_tree)
+
+plotcp(reg_tree)
+
+```
+### Experimenting with complexity parameter(cp).
+```{r}
+
+reg_tree1 <- rpart(imdb_score ~ ., train_reg, control = rpart.control(cp = 0.0001))
+
+plotcp(reg_tree1)
+
+```
+
+
+
+### Tree Explicability
+
+* The variable importance can accessed accessing variable.importance from the reg.tree list
+
+```{r}
+
+reg_tree$variable.importance
+
+```
+
+* We can plot the regression tree using the rpart.plot() function from the rpart.plot package
+
+```{r, fig.width=8, fig.height=5}
+
+library(rpart.plot)
+
+rpart.plot(reg_tree)
+
+```
+
+## Plotting the second tree with minimum cp
+```{r fig.width=45, fig.height=30}
+
+#rpart.plot(reg_tree1)
+
+```
+
+
+## Evaluation on Test Data
+
+* We can then proceed to evaluate the regression tree by comparing the predictions to the test data using the regr.eval() function from the DMwR package
+
+```{r}
+
+preds_reg <- predict(reg_tree, test_reg)
+
+preds_reg1 <- predict(reg_tree1, test_reg) #with the changed cp value
+
+```
+
+```{r}
+
+library(DMwR)
+
+regr.eval(test_reg$imdb_score, preds_reg)
+
+regr.eval(test_reg$imdb_score, preds_reg1) #with the changed cp value
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
