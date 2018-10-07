@@ -1,4 +1,4 @@
-# DataScience-Projects-Decision Trees
+# Decision Trees
 Projects on DataScience
 
 # C5.0 Trees
